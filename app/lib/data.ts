@@ -1,3 +1,4 @@
+import { db } from '@vercel/postgres';
 import { sql } from '@vercel/postgres';
 import {
   CustomerField,
@@ -9,6 +10,9 @@ import {
 } from './definitions';
 import { formatCurrency } from './utils';
 
+// NB:  Differs from example solutions as used db.connect and client.sql to fix sql connect not working
+const client = await db.connect();
+
 export async function fetchRevenue() {
   try {
     // Artificially delay a response for demo purposes.
@@ -17,7 +21,8 @@ export async function fetchRevenue() {
     console.log('Fetching revenue data...');
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    const data = await sql<Revenue>`SELECT * FROM revenue`;
+    const data = await client.sql<Revenue>`SELECT * FROM revenue`;
+    //const data = await sql<Revenue>`SELECT * FROM revenue`;
 
     console.log('Data fetch completed after 3 seconds.');
 
@@ -30,13 +35,21 @@ export async function fetchRevenue() {
 
 export async function fetchLatestInvoices() {
   try {
-    const data = await sql<LatestInvoiceRaw>`
+    //const data = await sql<LatestInvoiceRaw>`
+    // SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
+    // FROM invoices
+    // JOIN customers ON invoices.customer_id = customers.id
+    // ORDER BY invoices.date DESC
+    // LIMIT 5`;
+    const data = await client.sql<LatestInvoiceRaw>`
       SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
       FROM invoices
       JOIN customers ON invoices.customer_id = customers.id
       ORDER BY invoices.date DESC
       LIMIT 5`;
 
+    console.log('Data fetch completed for latest invoices');
+    
     const latestInvoices = data.rows.map((invoice) => ({
       ...invoice,
       amount: formatCurrency(invoice.amount),
@@ -53,12 +66,19 @@ export async function fetchCardData() {
     // You can probably combine these into a single SQL query
     // However, we are intentionally splitting them to demonstrate
     // how to initialize multiple queries in parallel with JS.
-    const invoiceCountPromise = sql`SELECT COUNT(*) FROM invoices`;
-    const customerCountPromise = sql`SELECT COUNT(*) FROM customers`;
-    const invoiceStatusPromise = sql`SELECT
-         SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
-         SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
-         FROM invoices`;
+    
+    //const invoiceCountPromise = sql`SELECT COUNT(*) FROM invoices`;
+    const invoiceCountPromise = client.sql`SELECT COUNT(*) FROM invoices`;
+    //const customerCountPromise = sql`SELECT COUNT(*) FROM customers`;
+    const customerCountPromise = client.sql`SELECT COUNT(*) FROM customers`;
+    // const invoiceStatusPromise = sql`SELECT
+    //      SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
+    //      SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
+    //      FROM invoices`;
+    const invoiceStatusPromise = client.sql`SELECT
+          SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
+          SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
+          FROM invoices`;
 
     const data = await Promise.all([
       invoiceCountPromise,
@@ -70,6 +90,7 @@ export async function fetchCardData() {
     const numberOfCustomers = Number(data[1].rows[0].count ?? '0');
     const totalPaidInvoices = formatCurrency(data[2].rows[0].paid ?? '0');
     const totalPendingInvoices = formatCurrency(data[2].rows[0].pending ?? '0');
+    console.log(totalPaidInvoices);
 
     return {
       numberOfCustomers,
