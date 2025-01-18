@@ -10,6 +10,7 @@ export default function LoginPage() {
                         <AcmeLogo />
                     </div>
                 </div>
+                <LoginForm />
             </div>
         </main>
     );
