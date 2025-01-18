@@ -14,6 +14,7 @@ import { formatCurrency } from './utils';
 const client = await db.connect();
 
 export async function fetchRevenue() {
+  
   try {
     // Artificially delay a response for demo purposes.
     // Don't do this in production :)
